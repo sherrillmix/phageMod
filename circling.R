@@ -1,12 +1,14 @@
 phage<-read.csv('data/phage_reads_for_abundance_analysis.csv',stringsAsFactors=FALSE)
 bac<-read.table('data/bacteria_16s_reads_for_abundance_analysis.tsv',stringsAsFactors=FALSE)
 
-linkFiles<-c(
-  'data/Scott_table_p.adjust_phage_bac_pairs_Family_Leveluse_annotated_phage_TRUE_Motif_occur_3_use_unclassified_bac_TRUE_use_GATCs_FALSE.csv',
-  'data/Scott_table_p.adjust_phage_bac_pairs_Genus_Leveluse_annotated_phage_TRUE_Motif_occur_3_use_unclassified_bac_TRUE_use_GATCs_FALSE.csv'
-)
+
+#linkFiles<-c(
+#  'data/Scott_table_p.adjust_phage_bac_pairs_Family_Leveluse_annotated_phage_TRUE_Motif_occur_3_use_unclassified_bac_TRUE_use_GATCs_FALSE.csv',
+#  'data/Scott_table_p.adjust_phage_bac_pairs_Genus_Leveluse_annotated_phage_TRUE_Motif_occur_3_use_unclassified_bac_TRUE_use_GATCs_FALSE.csv'
+#)
+linkFiles<-list.files('data/link/','*.csv',full.names=TRUE)
 links<-do.call(rbind,lapply(linkFiles,read.csv,stringsAsFactors=FALSE))
-links<-links[!grepl('Unclassified|Uncultured',links$Bacteria),]
+links<-unique(links[!grepl('Unclassified|Uncultured',links$Bacteria),])
 
 pCountCols<-colnames(phage)[grep('^X[0-9.]+$',colnames(phage))]
 bCountCols<-colnames(bac)[grep('^X[0-9.]+$',colnames(bac))]
