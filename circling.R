@@ -67,11 +67,13 @@ pVsB<-lapply(bacPhage,function(x){
 nLeft<-sapply(pVsB,function(x)sum(unlist(lapply(x,function(y)y[,'isLeft'])),na.rm=TRUE))
 nRight<-sapply(pVsB,function(x)sum(unlist(lapply(x,function(y)!y[,'isLeft'])),na.rm=TRUE))
 table(nLeft,nRight)
-
+plotOrder<-which(nLeft+nRight==max(nLeft+nRight))
+plotOrder<-plotOrder[order(nLeft[plotOrder]-nRight[plotOrder])]
+table('left'=nLeft[plotOrder],'right'=nRight[plotOrder])
 
 cols<-rainbow.lab(3,lightScale=0,lightMultiple=.7,alpha=.6)
 pdf('out/circle.pdf')
-  lapply(order(nLeft-nRight),function(ii){
+  lapply(plotOrder,function(ii){
     thisInfo<-links[ii,]
     thisPB<-pVsB[[ii]]
     thisCat<-do.call(rbind,thisPB)
@@ -79,4 +81,6 @@ pdf('out/circle.pdf')
     lapply(thisPB,function(x)arrows(x$bac[-nrow(x)],x$phage[-nrow(x)],x$bac[-1],x$phage[-1],length=.1))
   })
 dev.off()
+
+table(do.call(rbind,lapply(pVsB,function(x)do.call(rbind,x)))$isLeft)
 
