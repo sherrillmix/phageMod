@@ -1,21 +1,22 @@
 library(vipor)
 library(dnar)
+library(parallel)
 gatc<-read.csv('data/GATCs_per_contig_with_expected_and_mod_status.csv',stringsAsFactors=FALSE)
-pdf('test.pdf')
-hist(gatc$total_motif_occurrences-gatc$expected_GATCs,breaks=200)
-dev.off()
+#pdf('test.pdf')
+#hist(gatc$total_motif_occurrences-gatc$expected_GATCs,breaks=200)
+#dev.off()
 
-mod<-glm(I(total_motif_occurrences==0)~I(data_set=='Phage_25'),offset=log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='binomial')
-print(summary(mod))
-mod<-glm(I(total_motif_occurrences==0)~I(data_set=='Phage_25')+log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='binomial')
-print(summary(mod))
+#mod<-glm(I(total_motif_occurrences==0)~I(data_set=='Phage_25'),offset=log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='binomial')
+#print(summary(mod))
+#mod<-glm(I(total_motif_occurrences==0)~I(data_set=='Phage_25')+log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='binomial')
+#print(summary(mod))
 
-mod<-glm(total_motif_occurrences~data_set,offset=log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='poisson')
-mod<-glm(total_motif_occurrences~I(data_set=='Phage_25'),offset=log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='poisson')
-print(summary(mod))
+#mod<-glm(total_motif_occurrences~data_set,offset=log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='poisson')
+#mod<-glm(total_motif_occurrences~I(data_set=='Phage_25'),offset=log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='poisson')
+#print(summary(mod))
 
-mod<-glm(I(total_motif_occurrences==0)~data_set,offset=log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='binomial')
-print(summary(mod))
+#mod<-glm(I(total_motif_occurrences==0)~data_set,offset=log(expected_GATCs),data=gatc[!grepl('T4',gatc$data_set),],family='binomial')
+#print(summary(mod))
 
 #library(pscl)
 inv.logit<-plogis
@@ -26,7 +27,7 @@ gatc$prob<-(gatc$G.C/2)^2*((1-gatc$G.C)/2)^2
 gatc$totalProb<-gatc$contig_len*log(1-gatc$prob)
 gatc$logitProb<-gatc$totalProb-log(1-exp(gatc$totalProb))
 gatc$binomProb<-pbinom(gatc$total_motif_occurrences,gatc$contig_len,gatc$prob)
-mod<-glm(I(total_motif_occurrences==0)~data_set,offset=logitProb,data=gatc[!grepl('T4',gatc$data_set),],family='binomial')
+#mod<-glm(I(total_motif_occurrences==0)~data_set,offset=logitProb,data=gatc[!grepl('T4',gatc$data_set),],family='binomial')
 
 pdf('test.pdf')
   par(las=2,mar=c(10,5,.5,.5))
@@ -43,3 +44,54 @@ dev.off()
 seqs<-read.fa('work/seqs.fa')
 rownames(seqs)<-seqs$name
 with(seqs[gatc[logit(gatc$binomProb)< -50,'contig'],],write.fa(name,seq,'work/gatcDepleted.fa'))
+
+selector<-gatc$contig %in% rownames(seqs)
+warning('Throwing out ',sum(!selector),' contigs for not being in sequences')
+gatc<-gatc[selector,]
+rownames(seqs)[rownames(seqs) %in% gatc$contig][1:10]
+warning('Throwing out ',sum(!rownames(seqs) %in% gatc$contig),' contigs for not being in sequences')
+seqs<-seqs[gatc$contig,]
+
+dna<-c('A','C','T','G')
+twoMers<-as.vector(outer(dna,dna,paste,sep=''))
+fourMers<-as.vector(outer(twoMers,twoMers,paste,sep=''))
+names(fourMers)<-fourMers
+palin<-fourMers[fourMers==revComp(fourMers)]
+
+palinCounts<-do.call(cbind,cacheOperation('work/palin.Rdat',mclapply,palin,function(mer){
+  message(mer)
+  sapply(gregexpr(sprintf('(?=%s)',mer),seqs$seq,perl=TRUE),length)
+},mc.cores=8))
+rownames(palinCounts)<-seqs$name
+colnames(palinCounts)<-palin
+
+fourCounts<-do.call(cbind,cacheOperation('work/4mer.Rdat',mclapply,fourMers,function(mer){
+  message(mer)
+  sapply(gregexpr(sprintf('(?=%s)',mer),seqs$seq,perl=TRUE),length)
+},mc.cores=8))
+rownames(fourCounts)<-seqs$name
+colnames(fourCounts)<-fourMers
+
+gcProb<-function(seq,gc=.5){
+  nAT<-nchar(gsub('[^AT]+','',seq))
+  nGC<-nchar(gsub('[^GC]+','',seq))
+  p<-(gc/2)^nGC*((1-gc)/2)^nAT
+  if(revComp(seq)!=seq)p<-p*2
+  return(p)
+}
+
+palinP<-do.call(cbind,lapply(1:ncol(palinCounts),function(ii)pbinom(palinCounts[,ii],gatc$contig_len,gcProb(colnames(palinCounts)[ii],gatc$G.C))))
+colnames(palinP)<-colnames(palinCounts)
+palinP[palinP==0]<-min(palinP[palinP>0])
+
+fourP<-do.call(cbind,lapply(1:ncol(fourCounts),function(ii)pbinom(fourCounts[,ii],gatc$contig_len,gcProb(colnames(fourCounts)[ii],gatc$G.C))))
+colnames(fourP)<-colnames(fourCounts)
+fourP[fourP==0]<-min(fourP[fourP>0])
+
+png('out/palin4mers.png',height=1500,width=1500,res=200)
+  vpPlot(rep(colnames(palinP),each=nrow(palinP)),logit(as.vector(palinP)),las=2,col=NA,bg='#00000055',pch=21)
+dev.off()
+
+png('out/4mers.png',height=1500,width=6000,res=200)
+  vpPlot(rep(colnames(fourP),each=nrow(fourP)),logit(as.vector(fourP)),las=2,col=NA,bg='#00000055',pch=21)
+dev.off()
