@@ -22,9 +22,9 @@ model{
 
   for(ii in 1:nObs){
     if(counts[ii]==0){
-      increment_log_prob(log_sum_exp(bernoulli_log(1,theta[isPhage[ii]+1]^expected[ii]), bernoulli_log(0,theta[isPhage[ii]+1]^expected[ii])+ poisson_log(counts[ii],expected[ii]+lambda[ii])));
+      increment_log_prob(log_sum_exp(bernoulli_log(1,theta[isPhage[ii]+1]^expected[ii]), bernoulli_log(0,theta[isPhage[ii]+1]^expected[ii])+ poisson_log(counts[ii],expected[ii]*lambda[ii])));
     }else{
-      increment_log_prob(bernoulli_log(0,theta[isPhage[ii]+1]^expected[ii])+ poisson_log(counts[ii],expected[ii]+lambda[ii]));
+      increment_log_prob(bernoulli_log(0,theta[isPhage[ii]+1]^expected[ii])+ poisson_log(counts[ii],expected[ii]*lambda[ii]));
     }
   }
 }
