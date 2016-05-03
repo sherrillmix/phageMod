@@ -2,6 +2,7 @@ data{
   int <lower=0> nObs;
   int <lower=0, upper=1> isPhage[nObs];
   int <lower=0> counts[nObs];
+  real <lower=0> expected[nObs];
 }
 
 parameters{
@@ -21,9 +22,9 @@ model{
 
   for(ii in 1:nObs){
     if(counts[ii]==0){
-      increment_log_prob(log_sum_exp(bernoulli_log(1,theta[isPhage[ii]+1]), bernoulli_log(0,theta[isPhage[ii]+1])+ poisson_log(counts[ii],lambda[ii])));
+      increment_log_prob(log_sum_exp(bernoulli_log(1,theta[isPhage[ii]+1]^expected[ii]), bernoulli_log(0,theta[isPhage[ii]+1]^expected[ii])+ poisson_log(counts[ii],expected[ii]+lambda[ii])));
     }else{
-      increment_log_prob(bernoulli_log(0,theta[isPhage[ii]+1])+ poisson_log(counts[ii],lambda[ii]));
+      increment_log_prob(bernoulli_log(0,theta[isPhage[ii]+1]^expected[ii])+ poisson_log(counts[ii],expected[ii]+lambda[ii]));
     }
   }
 }
