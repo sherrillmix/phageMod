@@ -3,17 +3,22 @@ data{
   int <lower=0, upper=1> isPhage[nObs];
   int <lower=0> counts[nObs];
   real <lower=0> expected[nObs];
+  //real <lower=0> isModified[nObs];
 }
 
 parameters{
-  real beta[2];
+  real betaIntercept;
+  real betaPhage;
+  //real betaMod;
+  //real betaPhageMod;
   real <lower=0, upper=1> theta[2];
 }
 
 transformed parameters {
   real <lower=0> lambda[nObs];
   for(ii in 1:nObs){
-    lambda[ii]<-exp(beta[1]+beta[2]*isPhage[ii]);
+    //+betaMod*isModified[ii]+betaPhageMod*isModified[ii]*isPhage[ii])
+    lambda[ii]<-exp(betaIntercept+betaPhage*isPhage[ii]);
   }
 }
 
