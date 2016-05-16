@@ -1,7 +1,8 @@
 library(dnar)
 library(parallel)
-contigFiles<-list.files('data/','^Normal.*txt.gz$',full.names=TRUE)
+contigFiles<-sort(list.files('data/','^Normal.*txt.gz$',full.names=TRUE))
 contigs<-do.call(rbind,cacheOperation('work/allData.Rdat',lapply,contigFiles,read.table,header=TRUE,stringsAsFactors=FALSE))
+contigs<-contigs[cacheOperation('work/contigSort.Rdat',order,contigs$ID,contigs$Strand,contigs$Pos),]
 
 posBaseToSeq<-function(position,base,strand){
   positionOrder<-order(position)
@@ -42,5 +43,19 @@ posBaseToSeq<-function(position,base,strand){
 }
 
 splitIds<-split(1:nrow(contigs),contigs$ID)
+
+
 seqs<-cacheOperation('work/seqs.Rdat',lapply,splitIds,function(x){cat('.');posBaseToSeq(contigs[x,'Pos'],contigs[x,'Base'],ifelse(contigs[x,'Strand']=='Fwd','+','-'))})
 write.fa(names(seqs),seqs,'work/seqs.fa')
+
+
+
+
+pdf('test.pdf')
+  hist(log(contigs$IPDRatio),breaks=250)
+  hist(log(contigs$IPDRatio[log(contigs$IPDRatio)>2]),breaks=250)
+  par(mfrow=c(4,1))
+  for(ii in unique(contigs$Base)){
+    hist(log(contigs$IPDRatio[contigs$Base==ii]),breaks=250,main=ii,xlim=range(log(contigs$IPDRatio[contigs$IPDRatio>0])))
+  }
+dev.off()

@@ -18,9 +18,14 @@ if(!exists('baseSplit')){
   baseSplit<-lapply(bases,function(base){
     selector<-contigs$Base==base&contigs$plusMinus5 
     info<-contigs[selector,c('ID','Pos','Strand','Base','IPDRatio')]
-    kmers<-kmers[selector,]
-    return(list('info'=info,'kmer'=kmers))
+    thisKmers<-kmers[selector,]
+    allMotifs<-unlist(lapply(colnames(thisKmers),function(x){sprintf('%s_%s',x,unique(thisKmers[,x]))}))
+    motifIds<-structure(1:length(allMotifs),.Names=allMotifs)
+    thisKmers[,]<-sprintf('%s_%s',rep(colnames(thisKmers),each=nrow(thisKmers)),thisKmers)
+    kmerN<-apply(thisKmers,2,function(x)motifIds[x])
+    return(list('info'=info,'kmer'=kmerN,'motifs'=allMotifs))
   })
+
   rm(contigs)
   rm(kmers)
   rm(seqs)
@@ -39,19 +44,50 @@ if(!exists('baseSplit')){
 #}
 
 #kmerMat nMotif + 1 x nPos with first as intercept
-ipdLikeByContig<-function(ipds,kmers,motifActives,mus,sigma2s){
-  pMod<-kmerMat*motifActives
-  muSum<-apply(pMod,1,function(x)sum(mus[x]))
-  sigma2Sum<-apply(pMod,1,function(x)sum(sigma2s[x]))
-  return(sum(dnorm(ipds,muSum,sigma2Sum)))
+#,sigma2s
+ipdLikeByContig<-function(ipds,kmers,motifActives,mus,baseMu,baseSigma){
+  activeMu<-motifActives*mus
+  #activeSigmas<-motifActives*sigma2s
+  #muAdds<-motifActives %*% mus
+  #system.time(muAdds<-apply(kmers,1,function(x)sum(activeMu[x])))
+  #system.time(muAdds<-apply(matrix(activeMu[kmers],nrow=nrow(kmers)),1,sum))
+  muAdds<-apply(matrix(activeMu[kmers],nrow=nrow(kmers)),1,sum)
+  #sigmaAdds<-apply(kmers,1,function(x)sum(activeSigmas[x]))
+  #sigmaAdds <-motifActives %*% sigma2s
+  ps<-dnorm(ipds,baseMu+muAdds,baseSigma,log=TRUE)
+  return(sum(ps))
+}
+ipdLike<-function(ipds,kmers,splitIds,activeMotifs,...){
+  lapply(1:length(splitIds),function(ii,ipds,kmers,...){
+    cat('.')
+    ipdLikeByContig(ipds[splitIds[[ii]]],kmers[splitIds[[ii]],],activeMotifs[ii,],...)
+  },ipds,kmers,...)
 }
 
+analyzeBase<-function(info,kmer,allMotifs){
+  mus<-structure(rep(0,length(allMotifs)),.Names=allMotifs)
+  #kmer[,]<-as.numeric(motifIds[sprintf('%s_%s',rep(colnames(kmer),each=nrow(kmer)),kmer)])
+  baseMu<-0
+  baseSigma<-2
+  splitIds<-split(1:nrow(info),info$ID)
+  activeMotifs<-matrix(FALSE,nrow=length(splitIds),ncol=length(allMotifs),dimnames=list(names(splitIds),allMotifs))
+  browser()
+  system.time(ipdLike(info$IPDRatio,kmer,splitIds,activeMotifs,mus,baseMu,baseSigma))
+}
+analyzeBase(baseSplit[[1]]$info,baseSplit[[1]]$kmer,baseSplit[[1]]$motifs)
 
 #need dummy value to avoid model.matrix complain about singular columns
 #kmerMat<-model.matrix(~.,as.data.frame(rbind(rep('ZZZZ',ncol(baseSplit[[1]]$kmer)),baseSplit[[1]]$kmer[,])))
 #kmerMat<-kmerMat[-1,!grepl('ZZZZ',colnames(kmerMat))]
 #maybe dont need kmer matrix just use indexing
 
+#emAlgo<-function(info,kmer,allMotifs){
+  #motifLookup<-lapply(1:length(allMotifs),function(xx)which(kmer==xx,arr.ind=TRUE)[,'row'])
+  #newMu<-jj
+#}
+#newMu<-function(ipd,selector,baseMu){
+ #
+#}
 
 #ipdLikeByContig(baseSplit[[1]]$info$IPD,z,
 
